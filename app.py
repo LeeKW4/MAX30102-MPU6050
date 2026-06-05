@@ -2,20 +2,25 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import random
+import time
 
 # Set up browser tab titles and widescreen layout
 st.set_page_config(page_title="IoT Telemetry Dashboard", layout="wide")
 
-# Initialize short-term memory tracker for database updates
+# Initialize persistent memory registers for state tracking
 if "last_row_count" not in st.session_state:
     st.session_state.last_row_count = 0
-if "is_stalled" not in st.session_state:
-    st.session_state.is_stalled = False
+if "miss_count" not in st.session_state:
+    st.session_state.miss_count = 0
+if "is_sleeping" not in st.session_state:
+    st.session_state.is_sleeping = False
+if "cached_df" not in st.session_state:
+    st.session_state.cached_df = pd.DataFrame()
 
 # =============================================================================
 # DATA ACQUISITION LAYER (WITH CACHE BUSTING)
 # =============================================================================
-GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbL-Zz4Y4a1JyJl3siTKv6gJs3hH86FK4LJk1_ZxgPjXr5JK40HC0YSxN0l990XTTMbprjpTyLA-mv/pub?output=csv"
+GSHEET_CSV_URL = "hhttps://docs.google.com/spreadsheets/d/e/2PACX-1vRbL-Zz4Y4a1JyJl3siTKv6gJs3hH86FK4LJk1_ZxgPjXr5JK40HC0YSxN0l990XTTMbprjpTyLA-mv/pub?output=csv"
 
 def load_sensor_data():
     try:
@@ -24,7 +29,6 @@ def load_sensor_data():
         df = pd.read_csv(nocache_url)
         
         if not df.empty and 'Timestamp' in df.columns:
-            # Just clean the timestamp format without sorting by it to keep rows steady
             df['Timestamp'] = pd.to_datetime(df['Timestamp'])
         return df
     except Exception as e:
@@ -34,30 +38,41 @@ def load_sensor_data():
 # DASHBOARD HEADER INTERFACE
 # =============================================================================
 st.title("📊 Real-Time IoT Health & Motion Command Center")
-st.markdown("This dashboard automatically maintains a rolling window of your latest real-time sensor metrics.")
+st.markdown("This dashboard features an automated smart-sleep engine to protect memory bandwidth when the hardware is idle.")
 st.markdown("---")
 
 # =============================================================================
-# AUTOMATIC ROLLING ROW-WINDOW FRAGMENT (Updates every 2 seconds)
+# AUTOMATIC ROLLING ROW-WINDOW FRAGMENT (Smart Dynamic Cadence)
 # =============================================================================
-@st.fragment(run_every=2)
+# We run the check loop every 2 seconds normally. If sleeping, it shifts gears safely.
+refresh_rate = 5 if st.session_state.is_sleeping else 2
+
+@st.fragment(run_every=refresh_rate)
 def render_live_dashboard():
+    # 1. Fetch fresh data matrix from the sheet gateway
     raw_df = load_sensor_data()
     
     if not raw_df.empty:
         current_rows = len(raw_df)
         
-        # --- UPDATE CHECKER LOGIC ---
+        # --- SMART SLEEP ENGINE LOGIC EVALUATION ---
         if current_rows == st.session_state.last_row_count:
-            st.session_state.is_stalled = True
+            # Data hasn't changed. Advance the miss counter strike register
+            st.session_state.miss_count += 1
+            if st.session_state.miss_count >= 2:
+                st.session_state.is_sleeping = True
         else:
-            st.session_state.is_stalled = False
-            st.session_state.last_row_count = current_rows 
-            
-        # Isolate the absolute latest single snapshot row to display on the counters
-        latest_reading = raw_df.iloc[-1]
+            # WAKE UP SEQUENCE: Fresh data packet confirmed! Reset counters
+            st.session_state.is_sleeping = False
+            st.session_state.miss_count = 0
+            st.session_state.last_row_count = current_rows
+            st.session_state.cached_df = raw_df.copy() # Store fresh snapshot in state storage
+
+        # Always read calculations from memory when deep sleep is active to keep graphs stable
+        active_df = st.session_state.cached_df if st.session_state.is_sleeping else raw_df
+        latest_reading = active_df.iloc[-1]
         
-        # 1. LIVE HIGHLIGHT METRICS BLOCK (MAX30102 Vitals)
+        # 2. METRICS DISPLAY COUNTERS BLOCK
         st.subheader("❤️ Current Biometric Status")
         col1, col2, col3 = st.columns(3)
         
@@ -66,25 +81,19 @@ def render_live_dashboard():
         with col2:
             st.metric(label="Blood Oxygen (SpO2)", value=f"{int(latest_reading['SpO2'])} %")
         with col3:
-            st.metric(label="Total Logged Packets", value=f"{current_rows} rows")
+            st.metric(label="Total Logged Packets", value=f"{len(active_df)} rows")
             
         st.markdown("---")
         
-        # ---------------------------------------------------------------------
-        # CONDITIONAL RENDER: Freeze views if pipeline is idle
-        # ---------------------------------------------------------------------
-        if st.session_state.is_stalled:
-            st.info("⏳ **Pipeline Idle:** No new updates detected from the Pico W. Graphs are frozen to save memory.")
-            st.markdown("---")
-            st.subheader("📋 Last Active Window Database Snapshot")
-            # Pull the literal last 20 rows of the spreadsheet and reverse for logging view
-            rolling_df = raw_df.tail(20)
-            st.dataframe(rolling_df.iloc[::-1], use_container_width=True)
-            return 
-            
-        # 2. GRAPHICAL ROLLING VISUALIZATIONS (Only runs if data is actively updating)
+        # 3. PIPELINE STATUS ANNOUNCEMENTS
+        if st.session_state.is_sleeping:
+            st.warning(f"🛑 **Dashboard Suspended (No Updates for 2 Cycles):** Network pooling paused. Waiting for your Pico W to transmit a new entry before waking up...")
+        else:
+            st.success(f"🟢 **Pipeline Active:** Live streaming data packets smoothly. (Miss Counter: {st.session_state.miss_count}/2)")
+
+        # 4. GRAPHICAL ROLLING VISUALIZATIONS
         st.subheader("🔄 Live Dynamic Waveforms (Last 20 Packets Rolling Window)")
-        rolling_df = raw_df.tail(20)
+        rolling_df = active_df.tail(20)
         chart_col1, chart_col2 = st.columns(2)
         
         with chart_col1:
@@ -101,7 +110,7 @@ def render_live_dashboard():
             fig_gyro.update_layout(margin=dict(l=20, r=20, t=20, b=20))
             st.plotly_chart(fig_gyro, use_container_width=True)
             
-        # 3. RAW ROLLING DATABASE LOGS
+        # 5. RAW ROLLING DATABASE LOGS
         st.markdown("---")
         st.subheader("📋 Active Window Database Stream")
         st.dataframe(rolling_df.iloc[::-1], use_container_width=True)
@@ -109,5 +118,5 @@ def render_live_dashboard():
     else:
         st.warning("Database stream temporarily offline. Waiting for fresh Pico W sensor frames...")
 
-# Execute the rolling dashboard instance
+# Execute the smart-sleep tracking instance
 render_live_dashboard()
