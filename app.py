@@ -24,9 +24,8 @@ def load_sensor_data():
         df = pd.read_csv(nocache_url)
         
         if not df.empty and 'Timestamp' in df.columns:
-            # Clean up the timestamps and sort them chronologically
+            # Just clean the timestamp format without sorting by it to keep rows steady
             df['Timestamp'] = pd.to_datetime(df['Timestamp'])
-            df = df.sort_values(by='Timestamp').reset_index(drop=True)
         return df
     except Exception as e:
         return pd.DataFrame()
@@ -49,12 +48,11 @@ def render_live_dashboard():
         current_rows = len(raw_df)
         
         # --- UPDATE CHECKER LOGIC ---
-        # If the number of rows matches the last check, flag the system as stalled/idle
         if current_rows == st.session_state.last_row_count:
             st.session_state.is_stalled = True
         else:
             st.session_state.is_stalled = False
-            st.session_state.last_row_count = current_rows # Update memory with new row count
+            st.session_state.last_row_count = current_rows 
             
         # Isolate the absolute latest single snapshot row to display on the counters
         latest_reading = raw_df.iloc[-1]
@@ -73,21 +71,20 @@ def render_live_dashboard():
         st.markdown("---")
         
         # ---------------------------------------------------------------------
-        # CONDITIONAL RENDER: Freeze reading views if no new data arrived
+        # CONDITIONAL RENDER: Freeze views if pipeline is idle
         # ---------------------------------------------------------------------
         if st.session_state.is_stalled:
             st.info("⏳ **Pipeline Idle:** No new updates detected from the Pico W. Graphs are frozen to save memory.")
-            
-            # We still show the raw log table below so you can look at historical data frames
             st.markdown("---")
             st.subheader("📋 Last Active Window Database Snapshot")
-            rolling_df = raw_df.tail(20).reset_index(drop=True)
+            # Pull the literal last 20 rows of the spreadsheet and reverse for logging view
+            rolling_df = raw_df.tail(20)
             st.dataframe(rolling_df.iloc[::-1], use_container_width=True)
-            return # Exit the function here so the graphs don't waste power redrawing empty math
+            return 
             
         # 2. GRAPHICAL ROLLING VISUALIZATIONS (Only runs if data is actively updating)
         st.subheader("🔄 Live Dynamic Waveforms (Last 20 Packets Rolling Window)")
-        rolling_df = raw_df.tail(20).reset_index(drop=True)
+        rolling_df = raw_df.tail(20)
         chart_col1, chart_col2 = st.columns(2)
         
         with chart_col1:
