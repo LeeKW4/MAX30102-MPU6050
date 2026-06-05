@@ -33,7 +33,7 @@ st.markdown("This dashboard automatically maintains a rolling window of your lat
 st.markdown("---")
 
 # =============================================================================
-# AUTOMATIC ROLLING TIME-WINDOW FRAGMENT (Updates every 2 seconds)
+# AUTOMATIC ROLLING ROW-WINDOW FRAGMENT (Updates every 2 seconds)
 # =============================================================================
 @st.fragment(run_every=2)
 def render_live_dashboard():
@@ -41,17 +41,10 @@ def render_live_dashboard():
     
     if not raw_df.empty:
         # ---------------------------------------------------------------------
-        # AUTOMATIC MEMORY PURGE: Keep only the latest 30 seconds of live data
+        # TIMEZONE-SAFE FIXED MEMORY WINDOW: Keep exactly the last 20 uploaded rows
+        # As a new row comes in, the oldest row is dropped automatically!
         # ---------------------------------------------------------------------
-        latest_time = raw_df['Timestamp'].max()
-        time_threshold = latest_time - pd.Timedelta(seconds=30)
-        
-        # Filter dataframe to drop old values outside the active time window
-        rolling_df = raw_df[raw_df['Timestamp'] >= time_threshold].reset_index(drop=True)
-        
-        # Fallback: If 30 seconds calculation drops too many frames, keep the last 20 uploaded rows
-        if len(rolling_df) < 5:
-            rolling_df = raw_df.tail(20).reset_index(drop=True)
+        rolling_df = raw_df.tail(20).reset_index(drop=True)
             
         # Isolate the absolute latest single snapshot row to display on the counters
         latest_reading = raw_df.iloc[-1]
@@ -65,19 +58,18 @@ def render_live_dashboard():
         with col2:
             st.metric(label="Blood Oxygen (SpO2)", value=f"{int(latest_reading['SpO2'])} %")
         with col3:
-            st.metric(label="Active Rolling Buffer", value=f"{len(rolling_df)} data packets")
+            st.metric(label="Total Logged Packets", value=f"{len(raw_df)} rows")
             
         st.markdown("---")
         
-        # 2. GRAPHICAL ROLLING TIME-SERIES VISUALIZATIONS (MPU6050 & MAX30102)
-        st.subheader("🔄 Live Dynamic Waveforms (30s Rolling Window)")
+        # 2. GRAPHICAL ROLLING VISUALIZATIONS (MPU6050 & MAX30102)
+        st.subheader("🔄 Live Dynamic Waveforms (Last 20 Packets Rolling Window)")
         chart_col1, chart_col2 = st.columns(2)
         
         with chart_col1:
             st.markdown("**MPU6050 Accelerometer Profile (G-Force)**")
             fig_accel = px.line(rolling_df, x='Timestamp', y=['AX', 'AY', 'AZ'], 
                                 labels={'value': 'Acceleration (G)', 'variable': 'Axis'})
-            # Tighten the padding margins so the charts look clean as they shift
             fig_accel.update_layout(margin=dict(l=20, r=20, t=20, b=20))
             st.plotly_chart(fig_accel, use_container_width=True)
             
