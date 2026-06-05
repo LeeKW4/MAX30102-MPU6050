@@ -9,7 +9,7 @@ st.set_page_config(page_title="IoT Telemetry Dashboard", layout="wide")
 # =============================================================================
 # DATA ACQUISITION LAYER (WITH CACHE BUSTING)
 # =============================================================================
-GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vVvZ2qyY_IQ5xPzPEAbXuT_YYWZUhuLqmRWIZEW66H8qvSiglRBz4YdLrKaUn68nA4/pub?gid=0&single=true&output=csv"
+GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbL-Zz4Y4a1JyJl3siTKv6gJs3hH86FK4LJk1_ZxgPjXr5JK40HC0YSxN0l990XTTMbprjpTyLA-mv/pub?output=csv"
 
 def load_sensor_data():
     try:
