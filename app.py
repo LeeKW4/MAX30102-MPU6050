@@ -20,7 +20,7 @@ if "cached_df" not in st.session_state:
 # =============================================================================
 # DATA ACQUISITION LAYER (WITH CACHE BUSTING)
 # =============================================================================
-GSHEET_CSV_URL = "hhttps://docs.google.com/spreadsheets/d/e/2PACX-1vRbL-Zz4Y4a1JyJl3siTKv6gJs3hH86FK4LJk1_ZxgPjXr5JK40HC0YSxN0l990XTTMbprjpTyLA-mv/pub?output=csv"
+GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbL-Zz4Y4a1JyJl3siTKv6gJs3hH86FK4LJk1_ZxgPjXr5JK40HC0YSxN0l990XTTMbprjpTyLA-mv/pub?output=csv"
 
 def load_sensor_data():
     try:
