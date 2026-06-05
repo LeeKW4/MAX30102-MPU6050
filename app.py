@@ -7,28 +7,14 @@ import random
 st.set_page_config(page_title="IoT Telemetry Dashboard", layout="wide")
 
 # =============================================================================
-# UI TRICK: Hide the Streamlit "Running..." animation in the top right corner
-# This makes the 1-second refresh completely invisible to the user!
-# =============================================================================
-st.markdown("""
-    <style>
-        .stApp [data-testid="stToolbar"] { display: none; }
-    </style>
-""", unsafe_allow_html=True)
-
-# Initialize persistent memory to hold our "Screenshot"
-if "last_row_count" not in st.session_state:
-    st.session_state.last_row_count = 0
-if "screenshot_df" not in st.session_state:
-    st.session_state.screenshot_df = pd.DataFrame()
-
-# =============================================================================
 # DATA ACQUISITION LAYER
 # =============================================================================
+# Updated with your new Google Sheets CSV link
 GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbL-Zz4Y4a1JyJl3siTKv6gJs3hH86FK4LJk1_ZxgPjXr5JK40HC0YSxN0l990XTTMbprjpTyLA-mv/pub?output=csv"
 
 def load_sensor_data():
     try:
+        # Appending a random number forces Google to skip its cache and provide the newest row
         nocache_url = f"{GSHEET_CSV_URL}&nocache={random.randint(1, 100000)}"
         df = pd.read_csv(nocache_url)
         if not df.empty and 'Timestamp' in df.columns:
@@ -41,44 +27,24 @@ st.title("📊 Real-Time IoT Health & Motion Command Center")
 st.markdown("---")
 
 # =============================================================================
-# HIGH-SPEED BACKGROUND CHECKER (Runs exactly every 1 second)
+# HIGH-SPEED LIVE STREAMING FRAGMENT (Updates continually every 1 second)
 # =============================================================================
 @st.fragment(run_every=1)
 def render_live_dashboard():
     raw_df = load_sensor_data()
     
     if not raw_df.empty:
+        # Keep exactly the last 20 rows for a smooth rolling window
+        active_df = raw_df.tail(20).reset_index(drop=True)
+        latest_reading = active_df.iloc[-1]
         current_rows = len(raw_df)
         
-        # ---------------------------------------------------------------------
-        # SCREENSHOT LOGIC: Does the row count match our memory?
-        # ---------------------------------------------------------------------
-        if current_rows > st.session_state.last_row_count:
-            # NEW DATA: Update our memory and grab the newest 20 rows
-            st.session_state.last_row_count = current_rows
-            st.session_state.screenshot_df = raw_df.tail(20).reset_index(drop=True)
-            is_frozen = False
-        else:
-            # NO NEW DATA: Lock the visual state
-            is_frozen = True
-            
-        # Fallback just in case the app restarts mid-stream
-        if st.session_state.screenshot_df.empty:
-            st.session_state.screenshot_df = raw_df.tail(20).reset_index(drop=True)
-
-        # Always build the charts using our locked memory dataframe
-        active_df = st.session_state.screenshot_df
-        latest_reading = active_df.iloc[-1]
-        
-        # 1. LIVE HIGHLIGHT METRICS & DYNAMIC STATUS BANNER
+        # 1. LIVE HIGHLIGHT METRICS & STATUS BANNER
         col_title, col_status = st.columns([3, 1])
         with col_title:
             st.subheader("❤️ Current Biometric Status")
         with col_status:
-            if is_frozen:
-                st.error("📸 **SCREENSHOT MODE (FROZEN)**")
-            else:
-                st.success("🟢 **LIVE STREAMING**")
+            st.success("🟢 **LIVE STREAMING**")
                 
         col1, col2, col3 = st.columns(3)
         with col1:
