@@ -12,16 +12,17 @@ st.set_page_config(page_title="IoT Telemetry Dashboard", layout="wide")
 # Paste your published Comma-separated values (.csv) link here
 GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbL-Zz4Y4a1JyJl3siTKv6gJs3hH86FK4LJk1_ZxgPjXr5JK40HC0YSxN0l990XTTMbprjpTyLA-mv/pub?output=csv"
 
+import random
+
 def load_sensor_data():
     try:
-        # Pull down the latest live rows from your Google Sheets database
-        df = pd.read_csv(GSHEET_CSV_URL)
-        # Convert timestamp strings into real pandas datetime objects for clean charting
+        # Appending a random query parameter forces Google to bypass its cache
+        nocache_url = f"{GSHEET_CSV_URL}&nocache={random.randint(1, 100000)}"
+        df = pd.read_csv(nocache_url)
         if 'Timestamp' in df.columns:
             df['Timestamp'] = pd.to_datetime(df['Timestamp'])
         return df
     except Exception as e:
-        st.error(f"Failed to connect to spreadsheet database: {e}")
         return pd.DataFrame()
 
 # =============================================================================
@@ -73,14 +74,14 @@ if not df.empty:
         st.markdown("**Accelerometer Magnitude Profile (G-Force)**")
         # Generate an interactive line chart combining X, Y, and Z axes
         fig_accel = px.line(plot_df, x='Timestamp', y=['AX', 'AY', 'AZ'], 
-                            labels={'value': 'Acceleration (G)', 'variable': 'Axis'})
+                            labels={'value': 'Acceleration (G)', '': 'Axis'})
         st.plotly_chart(fig_accel, use_container_width=True)
         
     with chart_col2:
         st.markdown("**Gyroscope Angular Velocity Profile (°/s)**")
         # Generate an interactive line chart combining rotational velocity components
         fig_gyro = px.line(plot_df, x='Timestamp', y=['GX', 'GY', 'GZ'], 
-                           labels={'value': 'Rotation (°/s)', 'variable': 'Axis'})
+                           labels={'value': 'Rotation (°/s)', 'v': 'Axis'})
         st.plotly_chart(fig_gyro, use_container_width=True)
         
     # =============================================================================
