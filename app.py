@@ -6,22 +6,45 @@ import random
 # Set up browser tab titles and widescreen layout
 st.set_page_config(page_title="IoT Telemetry Dashboard", layout="wide")
 
+st.markdown("""
+    <style>
+        .stApp [data-testid="stToolbar"] { display: none; }
+    </style>
+""", unsafe_allow_html=True)
+
 # =============================================================================
-# DATA ACQUISITION LAYER
+# ANTI-RUBBER BANDING MEMORY: Protects against slow Google CDN servers
 # =============================================================================
-# Updated with your new Google Sheets CSV link
+if "best_df" not in st.session_state:
+    st.session_state.best_df = pd.DataFrame()
+if "max_time" not in st.session_state:
+    st.session_state.max_time = pd.Timestamp("1970-01-01")  # Start at zero time
+
 GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbL-Zz4Y4a1JyJl3siTKv6gJs3hH86FK4LJk1_ZxgPjXr5JK40HC0YSxN0l990XTTMbprjpTyLA-mv/pub?output=csv"
 
 def load_sensor_data():
     try:
-        # Appending a random number forces Google to skip its cache and provide the newest row
-        nocache_url = f"{GSHEET_CSV_URL}&nocache={random.randint(1, 100000)}"
+        nocache_url = f"{GSHEET_CSV_URL}&nocache={random.randint(1, 1000000)}"
         df = pd.read_csv(nocache_url)
+        
         if not df.empty and 'Timestamp' in df.columns:
             df['Timestamp'] = pd.to_datetime(df['Timestamp'])
-        return df
+            
+            # Find the newest timestamp in this downloaded file
+            current_max_time = df['Timestamp'].max()
+            
+            # THE ONE-WAY VALVE: Only accept the file if it goes forward in time!
+            if current_max_time >= st.session_state.max_time:
+                st.session_state.max_time = current_max_time
+                st.session_state.best_df = df
+                return df
+            else:
+                # Google gave us a stale file! Ignore it and return our protected memory.
+                return st.session_state.best_df
+                
+        return st.session_state.best_df
     except Exception as e:
-        return pd.DataFrame()
+        return st.session_state.best_df
 
 st.title("📊 Real-Time IoT Health & Motion Command Center")
 st.markdown("---")
