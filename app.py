@@ -8,7 +8,7 @@ st.set_page_config(page_title="IoT Telemetry Dashboard", layout="wide")
 
 # =============================================================================
 # UI TRICK: Hide the Streamlit "Running..." animation in the top right corner
-# This makes the dashboard look 100% frozen and dead when in screenshot mode!
+# This makes the 1-second refresh completely invisible to the user!
 # =============================================================================
 st.markdown("""
     <style>
@@ -41,9 +41,9 @@ st.title("📊 Real-Time IoT Health & Motion Command Center")
 st.markdown("---")
 
 # =============================================================================
-# INVISIBLE BACKGROUND CHECKER (Runs every 2 seconds quietly)
+# HIGH-SPEED BACKGROUND CHECKER (Runs exactly every 1 second)
 # =============================================================================
-@st.fragment(run_every=2)
+@st.fragment(run_every=1)
 def render_live_dashboard():
     raw_df = load_sensor_data()
     
